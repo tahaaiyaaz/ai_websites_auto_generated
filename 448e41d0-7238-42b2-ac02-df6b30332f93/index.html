@@ -1,0 +1,358 @@
+<div id="arrayofalltheworkflowsandtheirdetails"></div>
+<h1>hi</h1>
+<script >
+    let el = document.querySelector('#arrayofalltheworkflowsandtheirdetails')
+
+console.log("hi",el)
+
+
+
+function createInteractiveList(data, targetElementId) {
+    const targetElement = document.getElementById(targetElementId);
+    if (!targetElement) {
+        console.error(`Target element with ID "${targetElementId}" not found.`);
+        return;
+    }
+    console.log(targetElement)
+
+    // Clear previous content if any
+    targetElement.innerHTML = '';
+
+    // --- CSS Styles ---
+    // Inject CSS directly for self-contained example
+    const style = document.createElement('style');
+    style.textContent = `
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fc;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .list-container {
+            max-width: 700px;
+            margin: 30px auto;
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .list-container h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+
+        .item-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        /* --- Color Statuses --- */
+        .status-not-pending { /* Pending: false (Red) */
+            background-color: #ffebee; /* Light Red */
+            border-left: 5px solid #e57373; /* Red */
+        }
+        .status-pending { /* Pending: true (Orange) */
+            background-color: #fff3e0; /* Light Orange */
+            border-left: 5px solid #ffb74d; /* Orange */
+        }
+        .status-first-pending { /* First Pending: true (Green) */
+            background-color: #e8f5e9; /* Light Green */
+            border-left: 5px solid #81c784; /* Green */
+        }
+        /* --- --- */
+
+        .item-details {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            margin-right: 15px; /* Space before toggle */
+        }
+
+        .item-details span {
+            display: block; /* Each on its own line */
+        }
+
+        .refcode-display {
+            font-weight: bold;
+            color: #34495e;
+            font-size: 0.95em;
+            margin-bottom: 3px;
+        }
+
+        .workflow-display {
+            font-size: 0.85em;
+            color: #7f8c8d;
+        }
+
+        /* --- Toggle Switch Styles --- */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px; /* Width of the toggle */
+            height: 26px; /* Height of the toggle */
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ffb74d; /* Default OFF (Pending=true) - Orange */
+            transition: .4s;
+            border-radius: 26px; /* Fully rounded */
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px; /* Size of the knob */
+            width: 20px;
+            left: 3px; /* Position from left */
+            bottom: 3px; /* Position from bottom */
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%; /* Circular knob */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        /* Input Checked State (Toggle is ON -> Pending=false) */
+        input:checked + .slider {
+            background-color: #e57373; /* Red when ON (Pending=false) */
+        }
+
+         /* Apply green background if it's the first pending */
+        .status-first-pending .toggle-switch .slider {
+             background-color: #81c784; /* Green when OFF (Pending=true and first) */
+        }
+        /* Keep red background when checked (Pending=false) even if it was green */
+        .status-first-pending .toggle-switch input:checked + .slider {
+            background-color: #e57373;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px); /* Move knob to the right */
+        }
+        /* --- End Toggle Styles --- */
+
+        .update-button {
+            display: block;
+            width: 100%;
+            padding: 12px 20px;
+            margin-top: 25px;
+            background-color: #3498db; /* Blue */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            text-align: center;
+        }
+
+        .update-button:hover {
+            background-color: #2980b9;
+        }
+         .update-button:active {
+            background-color: #2575a7;
+        }
+    `;
+    document.head.appendChild(style); // Add styles to the head
+
+    // --- Main Container ---
+    const containerDiv = document.createElement('div');
+    containerDiv.className = 'list-container';
+
+    const title = document.createElement('h2');
+    title.textContent = 'Pending Items';
+    containerDiv.appendChild(title);
+
+    // --- List Creation ---
+    const ul = document.createElement('ul');
+    ul.className = 'item-list';
+
+    // Keep track of the data locally to update it
+    // Create a deep copy to avoid modifying the original array outside this function if needed
+    const localData = JSON.parse(JSON.stringify(data));
+    let firstPendingIndex = -1; // Track the index of the first true pending item
+
+    // Find the first pending item initially
+    firstPendingIndex = localData.findIndex(item => item.pending === true);
+
+    // Function to apply correct styles based on the current data state
+    const updateListStyles = () => {
+        firstPendingIndex = localData.findIndex(item => item.pending === true); // Re-find first pending
+        const listItems = ul.querySelectorAll('.list-item'); // Get all li elements
+
+        listItems.forEach((li, index) => {
+            const itemData = localData[index]; // Get corresponding data
+            li.classList.remove('status-not-pending', 'status-pending', 'status-first-pending'); // Clear old status classes
+
+            const slider = li.querySelector('.slider'); // Find the slider span
+
+            if (itemData.pending === false) {
+                li.classList.add('status-not-pending'); // Red
+            } else { // pending === true
+                if (index === firstPendingIndex) {
+                    li.classList.add('status-first-pending'); // Green
+                } else {
+                    li.classList.add('status-pending'); // Orange
+                }
+            }
+             // Ensure slider background matches the state (needed after toggling)
+             // Important: This part needs refinement as classes handle the slider color now
+             // Let's rely on the CSS class rules added above.
+             // The CSS now uses `.status-first-pending .toggle-switch .slider` etc.
+        });
+    };
+
+
+    // --- Create List Items ---
+    localData.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'list-item';
+        // Add a data attribute to easily link the li element back to its data index
+        li.dataset.index = index;
+
+        // Item Details Div
+        const detailsDiv = document.createElement('div');
+        detailsDiv.className = 'item-details';
+
+        const refcodeSpan = document.createElement('span');
+        refcodeSpan.className = 'refcode-display';
+        refcodeSpan.textContent = item.refcode;
+        detailsDiv.appendChild(refcodeSpan);
+
+        const workflowSpan = document.createElement('span');
+        workflowSpan.className = 'workflow-display';
+        workflowSpan.textContent = `Workflow: ${item.workflowname}`;
+        detailsDiv.appendChild(workflowSpan);
+
+        li.appendChild(detailsDiv);
+
+        // Toggle Switch
+        const toggleLabel = document.createElement('label');
+        toggleLabel.className = 'toggle-switch';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        // IMPORTANT TOGGLE LOGIC:
+        // Checkbox is CHECKED when PENDING is FALSE (Toggle is ON)
+        // Checkbox is UNCHECKED when PENDING is TRUE (Toggle is OFF)
+        checkbox.checked = !item.pending;
+
+        const sliderSpan = document.createElement('span');
+        sliderSpan.className = 'slider';
+
+        toggleLabel.appendChild(checkbox);
+        toggleLabel.appendChild(sliderSpan);
+        li.appendChild(toggleLabel);
+
+        // Add Event Listener to the Checkbox
+        checkbox.addEventListener('change', (event) => {
+            const currentItemIndex = parseInt(li.dataset.index, 10); // Get index from data attribute
+            const isChecked = event.target.checked; // Checkbox state AFTER click
+
+            // Update the local data array
+            // If checked, pending becomes false. If unchecked, pending becomes true.
+            localData[currentItemIndex].pending = !isChecked;
+
+            console.log(`Toggled item ${localData[currentItemIndex].refcode}. New pending status: ${localData[currentItemIndex].pending}`);
+
+            // Update the visual styles for ALL items to handle the "first green" logic correctly
+            updateListStyles();
+        });
+
+        ul.appendChild(li);
+    });
+
+    containerDiv.appendChild(ul);
+
+    // Initial styling application
+    updateListStyles(); // Call once after creating all items
+
+    // --- Update Button ---
+    const updateButton = document.createElement('button');
+    updateButton.className = 'update-button';
+    updateButton.textContent = 'Update Pending Status';
+
+    updateButton.addEventListener('click', () => {
+        console.log("--- Submitting Updated Data ---");
+        // Here you would typically send 'localData' to your server/backend
+        console.log(JSON.stringify(localData, null, 2)); // Pretty print the JSON
+        alert('Updated data logged to console. Check the developer tools (F12).');
+        // Add actual update logic here (e.g., fetch POST request)
+    });
+
+    containerDiv.appendChild(updateButton);
+
+    // Append the main container to the target element
+    targetElement.appendChild(containerDiv);
+}
+
+// --- Data ---
+const myData = [
+    {
+        "refcode": "PID\\2025-26\\31-1",
+        "workflowname": "default",
+        "pending": true,
+        "raisecrdone": false,
+        "indexofraisecr": 0
+    },
+    {
+        "refcode": "PID\\2025-26\\32-1",
+        "workflowname": "default",
+        "pending": true,
+        "raisecrdone": false,
+        "indexofraisecr": 0
+    },
+    {
+        "refcode": "PID\\2025-26\\33-5",
+        "workflowname": "approval",
+        "pending": false, // Example of a non-pending item
+        "raisecrdone": true,
+        "indexofraisecr": 1
+    },
+     {
+        "refcode": "PID\\2025-26\\34-2",
+        "workflowname": "review",
+        "pending": true,
+        "raisecrdone": false,
+        "indexofraisecr": 0
+    }
+];
+
+// --- How to Use ---
+// Assuming you have an element in your HTML like: <div id="myListContainer"></div>
+// Call the function after the DOM is loaded:
+
+    createInteractiveList(myData, "arrayofalltheworkflowsandtheirdetails");
+
+</script>
